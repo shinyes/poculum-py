@@ -677,8 +677,8 @@ def test_size_reduction():
     json_deserialized = json.loads(json_serialized.decode('utf-8'))
     json_deserialize_time = time.time() - start
 
-    print(f'poculum: {len(mb_serialized)} bytes, {mb_serialize_time+mb_deserialize_time:.4f}s')
-    print(f'JSON: {len(json_serialized)} bytes, {json_serialize_time+json_deserialize_time:.4f}s')
+    print(f'poculum: {len(mb_serialized)} bytes, serialize: {mb_serialize_time:.4f}s, deserialize: {mb_deserialize_time:.4f}s')
+    print(f'JSON: {len(json_serialized)} bytes, serialize: {json_serialize_time+json_deserialize_time:.4f}s, deserialize: {json_deserialize_time:.4f}s')
     print(f'Size reduction: {(1-len(mb_serialized)/len(json_serialized))*100:.1f}%')
 
 if __name__ == "__main__":
