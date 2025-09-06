@@ -652,7 +652,37 @@ def test_poculum():
             print(f"Test {i+1} FAILED: {e}")
             print()
 
+def test_size_reduction():
+    import time
+    import json
+
+    # 创建测试数据
+    data = {'numbers': list(range(1000)), 'text': 'hello' * 100}
+
+    # poculum 测试
+    start = time.time()
+    mb_serialized = dump_poculum(data)
+    mb_serialize_time = time.time() - start
+
+    start = time.time()
+    mb_deserialized = load_poculum(mb_serialized)
+    mb_deserialize_time = time.time() - start
+
+    # JSON 测试（对比）
+    start = time.time()
+    json_serialized = json.dumps(data).encode('utf-8')
+    json_serialize_time = time.time() - start
+
+    start = time.time()
+    json_deserialized = json.loads(json_serialized.decode('utf-8'))
+    json_deserialize_time = time.time() - start
+
+    print(f'poculum: {len(mb_serialized)} bytes, {mb_serialize_time+mb_deserialize_time:.4f}s')
+    print(f'JSON: {len(json_serialized)} bytes, {json_serialize_time+json_deserialize_time:.4f}s')
+    print(f'Size reduction: {(1-len(mb_serialized)/len(json_serialized))*100:.1f}%')
 
 if __name__ == "__main__":
     test_poculum()
+    print("---test size reduction--")
+    test_size_reduction()
     
