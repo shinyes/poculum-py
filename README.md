@@ -415,7 +415,7 @@ print(f'Size reduction: {(1-len(mb_serialized)/len(json_serialized))*100:.1f}%')
 
 ### Q: 为什么选择 poculum 而不是 JSON？
 
-A: poculum 提供更紧凑的存储（减少 30-50% 空间）、更快的解析速度，以及原生的二进制数据支持。
+A: poculum 提供更紧凑的存储（减少 30-50% 空间）、原生的二进制数据支持。
 
 ### Q: 可以序列化自定义类吗？
 

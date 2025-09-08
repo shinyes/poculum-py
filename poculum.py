@@ -188,6 +188,177 @@ def dump_poculum(obj):
         raise TypeError(f"Unsupported type: {type(obj)}")
 
 
+def _get_item_size(box: bytes, offset: int = 0):
+    """
+    计算从指定偏移量开始的一个项目占用的字节数
+    
+    Args:
+        box: 字节数据
+        offset: 起始偏移量
+        
+    Returns:
+        该项目占用的字节数
+        
+    Raises:
+        IndexError: 当数据长度不足时
+        ValueError: 当遇到未知类型时
+    """
+    if offset >= len(box):
+        raise IndexError("Offset exceeds data length")
+    
+    type_byte = box[offset]
+    
+    # uint8-uint128, int8-int128
+    if type_byte in [0x01, 0x11]:  # uint8, int8
+        return 2
+    elif type_byte in [0x02, 0x12]:  # uint16, int16
+        return 3
+    elif type_byte in [0x03, 0x13]:  # uint32, int32
+        return 5
+    elif type_byte in [0x04, 0x14]:  # uint64, int64
+        return 9
+    elif type_byte in [0x05, 0x15]:  # uint128, int128
+        return 17
+    
+    # float32, float64
+    elif type_byte == 0x21:  # float32
+        return 5
+    elif type_byte == 0x22:  # float64
+        return 9
+    
+    # fixstring
+    elif 0x30 <= type_byte <= 0x3F:
+        length = type_byte - 0x30
+        return 1 + length
+    
+    # string16
+    elif type_byte == 0x41:
+        if offset + 3 > len(box):
+            raise IndexError("Insufficient data for string16 length")
+        length = int.from_bytes(box[offset + 1:offset + 3], "big")
+        return 3 + length
+    
+    # string32
+    elif type_byte == 0x42:
+        if offset + 5 > len(box):
+            raise IndexError("Insufficient data for string32 length")
+        length = int.from_bytes(box[offset + 1:offset + 5], "big")
+        return 5 + length
+    
+    # fixlist
+    elif 0x50 <= type_byte <= 0x5F:
+        length = type_byte - 0x50
+        size = 1  # 类型字节
+        current_offset = offset + 1
+        for _ in range(length):
+            item_size = _get_item_size(box, current_offset)
+            size += item_size
+            current_offset += item_size
+        return size
+    
+    # list16
+    elif type_byte == 0x61:
+        if offset + 3 > len(box):
+            raise IndexError("Insufficient data for list16 length")
+        length = int.from_bytes(box[offset + 1:offset + 3], "big")
+        size = 3  # 类型字节 + 长度字节
+        current_offset = offset + 3
+        for _ in range(length):
+            item_size = _get_item_size(box, current_offset)
+            size += item_size
+            current_offset += item_size
+        return size
+    
+    # list32
+    elif type_byte == 0x62:
+        if offset + 5 > len(box):
+            raise IndexError("Insufficient data for list32 length")
+        length = int.from_bytes(box[offset + 1:offset + 5], "big")
+        size = 5  # 类型字节 + 长度字节
+        current_offset = offset + 5
+        for _ in range(length):
+            item_size = _get_item_size(box, current_offset)
+            size += item_size
+            current_offset += item_size
+        return size
+    
+    # fixmap
+    elif 0x70 <= type_byte <= 0x7F:
+        length = type_byte - 0x70
+        size = 1  # 类型字节
+        current_offset = offset + 1
+        for _ in range(length):
+            # 键
+            key_size = _get_item_size(box, current_offset)
+            size += key_size
+            current_offset += key_size
+            # 值
+            value_size = _get_item_size(box, current_offset)
+            size += value_size
+            current_offset += value_size
+        return size
+    
+    # map16
+    elif type_byte == 0x81:
+        if offset + 3 > len(box):
+            raise IndexError("Insufficient data for map16 length")
+        length = int.from_bytes(box[offset + 1:offset + 3], "big")
+        size = 3  # 类型字节 + 长度字节
+        current_offset = offset + 3
+        for _ in range(length):
+            # 键
+            key_size = _get_item_size(box, current_offset)
+            size += key_size
+            current_offset += key_size
+            # 值
+            value_size = _get_item_size(box, current_offset)
+            size += value_size
+            current_offset += value_size
+        return size
+    
+    # map32
+    elif type_byte == 0x82:
+        if offset + 5 > len(box):
+            raise IndexError("Insufficient data for map32 length")
+        length = int.from_bytes(box[offset + 1:offset + 5], "big")
+        size = 5  # 类型字节 + 长度字节
+        current_offset = offset + 5
+        for _ in range(length):
+            # 键
+            key_size = _get_item_size(box, current_offset)
+            size += key_size
+            current_offset += key_size
+            # 值
+            value_size = _get_item_size(box, current_offset)
+            size += value_size
+            current_offset += value_size
+        return size
+    
+    # bytes8
+    elif type_byte == 0x91:
+        if offset + 2 > len(box):
+            raise IndexError("Insufficient data for bytes8 length")
+        length = box[offset + 1]
+        return 2 + length
+    
+    # bytes16
+    elif type_byte == 0x92:
+        if offset + 3 > len(box):
+            raise IndexError("Insufficient data for bytes16 length")
+        length = int.from_bytes(box[offset + 1:offset + 3], "big")
+        return 3 + length
+    
+    # bytes32
+    elif type_byte == 0x93:
+        if offset + 5 > len(box):
+            raise IndexError("Insufficient data for bytes32 length")
+        length = int.from_bytes(box[offset + 1:offset + 5], "big")
+        return 5 + length
+    
+    else:
+        raise ValueError(f"Unknown type identifier: 0x{type_byte:02x}")
+
+
 def load_poculum(box: bytes):
     """
     将字节格式反序列化为 Python 对象
@@ -370,9 +541,9 @@ def load_poculum(box: bytes):
             try:
                 item = load_poculum(item_box)
                 result.append(item)
-                # 计算已消耗的字节数并更新偏移量
-                item_bytes = dump_poculum(item)
-                offset += len(item_bytes)
+                # 使用高效的方式计算已消耗的字节数
+                item_size = _get_item_size(box, offset)
+                offset += item_size
             except RecursionError:
                 raise ValueError(
                     "Maximum recursion depth exceeded while parsing nested structure"
@@ -397,8 +568,8 @@ def load_poculum(box: bytes):
             try:
                 item = load_poculum(item_box)
                 result.append(item)
-                item_bytes = dump_poculum(item)
-                offset += len(item_bytes)
+                item_size = _get_item_size(box, offset)
+                offset += item_size
             except RecursionError:
                 raise ValueError(
                     "Maximum recursion depth exceeded while parsing nested structure"
@@ -423,8 +594,8 @@ def load_poculum(box: bytes):
             try:
                 item = load_poculum(item_box)
                 result.append(item)
-                item_bytes = dump_poculum(item)
-                offset += len(item_bytes)
+                item_size = _get_item_size(box, offset)
+                offset += item_size
             except RecursionError:
                 raise ValueError(
                     "Maximum recursion depth exceeded while parsing nested structure"
@@ -448,8 +619,8 @@ def load_poculum(box: bytes):
             key_box = box[offset:]
             try:
                 key = load_poculum(key_box)
-                key_bytes = dump_poculum(key)
-                offset += len(key_bytes)
+                key_size = _get_item_size(box, offset)
+                offset += key_size
             except RecursionError:
                 raise ValueError(
                     "Maximum recursion depth exceeded while parsing nested structure"
@@ -464,8 +635,8 @@ def load_poculum(box: bytes):
             value_box = box[offset:]
             try:
                 value = load_poculum(value_box)
-                value_bytes = dump_poculum(value)
-                offset += len(value_bytes)
+                value_size = _get_item_size(box, offset)
+                offset += value_size
             except RecursionError:
                 raise ValueError(
                     "Maximum recursion depth exceeded while parsing nested structure"
@@ -493,8 +664,8 @@ def load_poculum(box: bytes):
             key_box = box[offset:]
             try:
                 key = load_poculum(key_box)
-                key_bytes = dump_poculum(key)
-                offset += len(key_bytes)
+                key_size = _get_item_size(box, offset)
+                offset += key_size
             except RecursionError:
                 raise ValueError(
                     "Maximum recursion depth exceeded while parsing nested structure"
@@ -509,8 +680,8 @@ def load_poculum(box: bytes):
             value_box = box[offset:]
             try:
                 value = load_poculum(value_box)
-                value_bytes = dump_poculum(value)
-                offset += len(value_bytes)
+                value_size = _get_item_size(box, offset)
+                offset += value_size
             except RecursionError:
                 raise ValueError(
                     "Maximum recursion depth exceeded while parsing nested structure"
@@ -538,8 +709,8 @@ def load_poculum(box: bytes):
             key_box = box[offset:]
             try:
                 key = load_poculum(key_box)
-                key_bytes = dump_poculum(key)
-                offset += len(key_bytes)
+                key_size = _get_item_size(box, offset)
+                offset += key_size
             except RecursionError:
                 raise ValueError(
                     "Maximum recursion depth exceeded while parsing nested structure"
@@ -554,8 +725,8 @@ def load_poculum(box: bytes):
             value_box = box[offset:]
             try:
                 value = load_poculum(value_box)
-                value_bytes = dump_poculum(value)
-                offset += len(value_bytes)
+                value_size = _get_item_size(box, offset)
+                offset += value_size
             except RecursionError:
                 raise ValueError(
                     "Maximum recursion depth exceeded while parsing nested structure"
